@@ -1,5 +1,5 @@
 function metersToPx(meters) {
-  return Math.round(meters * 180);
+  return Math.round(meters * 220);
 }
 
 function inchesToPx(inches) {
@@ -15,7 +15,7 @@ let table = {
   height: inchesToPx(103),
 };
 
-let tableToRoomDistance = feetToPx(3, 5);
+let tableToRoomDistance = feetToPx(1); // 3' 5"
 
 let playArea = {
   width: inchesToPx(44),
@@ -64,9 +64,19 @@ let balls;
 let pocketDiameter = inchesToPx(4 + 5 / 8);
 
 let ballDiameter = inchesToPx(4); // inchesToPx(2 + 1 / 4);
+let ballRadius = ballDiameter / 2;
 
 let ballLabelFontSize = inchesToPx(1 + 1 / 2);
 let ballLabelDiameter = inchesToPx(2 + 1 / 4);
+
+let cueStickLength = inchesToPx(56);
+
+let attrition = 0.95;
+let bounceAttrition = 0.9;
+let minVelocity2 = 1;
+
+let maxVelocity = metersToPx(11.6); // m/s
+let maxStickPull = inchesToPx(25);
 
 let styles;
 
@@ -109,19 +119,32 @@ function setup() {
       textAlign(CENTER, CENTER);
       fill(30);
     },
+    stick: () => {
+      stroke(20, 70, 90);
+      strokeWeight(5);
+    },
   };
 
-  createCanvas(room.width, room.height);
+  let cv = createCanvas(room.width, room.height);
   balls = initBalls();
+  cv.mouseClicked(() => {
+    if (!isMoving(balls[0])) {
+      hit(balls[0]);
+    }
+  });
 }
 
 function draw() {
   background(styles.background());
   drawTable();
-  for (let i = 0; i < balls.length; i++) {
-    let ball = balls[i];
-    drawAnyBall(ball.x, ball.y, ball.color, ball.number);
+  drawBalls();
+  if (!isMoving(balls[0])) {
+    drawStick(balls[0]);
   }
+  updatePositions();
+  bounceBallsOnWalls();
+  applyBallsCollisions();
+  checkHoles();
 }
 
 function drawBumper() {
@@ -150,7 +173,7 @@ function drawTableFrame() {
   );
 }
 
-function drawpockets() {
+function drawPockets() {
   styles.pocket();
   for (let i = 0; i < pockets.length; i++) {
     circle(pockets[i].x, pockets[i].y, pocketDiameter);
@@ -161,7 +184,7 @@ function drawTable() {
   drawTableFrame();
   drawBumper();
   drawGreen();
-  drawpockets();
+  drawPockets();
 }
 
 function initBalls() {
@@ -287,11 +310,7 @@ function drawBall(x, y, color) {
   circle(x, y, ballDiameter);
   styles.ballHighlight();
   let factor = 0.15;
-  circle(
-    x - ballDiameter * factor,
-    y - ballDiameter * factor,
-    ballDiameter / 2
-  );
+  circle(x - ballDiameter * factor, y - ballDiameter * factor, ballRadius);
 }
 
 function drawAnyBall(x, y, color, number) {
@@ -302,4 +321,159 @@ function drawAnyBall(x, y, color, number) {
     styles.ballLabelText();
     text(String(number), x, y);
   }
+}
+
+function drawBalls() {
+  for (let i = 0; i < balls.length; i++) {
+    let ball = balls[i];
+    drawAnyBall(ball.x, ball.y, ball.color, ball.number);
+  }
+}
+
+function drawStick(ballPosition) {
+  styles.stick();
+  let ex = mouseX - ballPosition.x;
+  let ey = mouseY - ballPosition.y;
+  // let d = Math.min(maxVelocity, Math.sqrt(ex * ex + ey * ey))
+  let a = Math.atan2(ey, ex);
+  line(
+    mouseX,
+    mouseY,
+    mouseX + Math.cos(a) * cueStickLength,
+    mouseY + Math.sin(a) * cueStickLength
+  );
+}
+
+function hit(ball) {
+  let ex = mouseX - ball.x;
+  let ey = mouseY - ball.y;
+  let d = Math.min(Math.sqrt(ex * ex + ey * ey), maxStickPull);
+  let a = Math.atan2(ey, ex);
+  let v = (d / maxStickPull) * maxVelocity;
+  ball.vx = -Math.cos(a) * v;
+  ball.vy = -Math.sin(a) * v;
+}
+
+function applyVelocity(ball) {
+  let mul = deltaTime / 1000;
+  ball.x += ball.vx * mul;
+  ball.y += ball.vy * mul;
+  ball.vx *= attrition;
+  ball.vy *= attrition;
+  let v = ball.vx * ball.vx + ball.vy * ball.vy;
+  if (v < minVelocity2) {
+    ball.vx = 0;
+    ball.vy = 0;
+  }
+}
+
+function updatePositions() {
+  balls.forEach(applyVelocity);
+}
+
+function bounceBall(ball) {
+  if (ball.x < playArea.x) {
+    ball.x = playArea.x;
+    ball.vx = -bounceAttrition * ball.vx;
+  } else if (ball.x > playArea.x + playArea.width) {
+    ball.x = playArea.x + playArea.width;
+    ball.vx = -bounceAttrition * ball.vx;
+  }
+
+  if (ball.y < playArea.y) {
+    ball.y = playArea.y;
+    ball.vy = -bounceAttrition * ball.vy;
+  } else if (ball.y > playArea.y + playArea.height) {
+    ball.y = playArea.y + playArea.height;
+    ball.vy = -bounceAttrition * ball.vy;
+  }
+}
+
+function bounceBallsOnWalls() {
+  balls.forEach(bounceBall);
+}
+
+function testCollision(a, r1, b, r2) {
+  let dx = a.x - b.x;
+  let dy = a.y - b.y;
+  let distance = Math.sqrt(dx * dx + dy * dy);
+  return distance <= r1 + r2;
+}
+
+// https://en.wikipedia.org/wiki/Elastic_collision
+function applyBallsCollision(a, b) {
+  let tvx = b.y - a.y;
+  let tvy = -(b.x - a.x);
+  let td = Math.sqrt(tvx * tvx + tvy * tvy);
+  tvx /= td;
+  tvy /= td;
+
+  let rvx = a.vx - b.vx;
+  let rvy = a.vy - b.vy;
+
+  let dp = tvx * rvx + tvy * rvy;
+
+  let vcOnTangentX = tvx * dp;
+  let vcOnTangentY = tvy * dp;
+
+  let vcPerpendicularToTangentX = rvx - vcOnTangentX;
+  let vcPerpendicularToTangentY = rvy - vcOnTangentY;
+
+  a.vx -= vcPerpendicularToTangentX;
+  a.vy -= vcPerpendicularToTangentY;
+
+  b.vx += vcPerpendicularToTangentX;
+  b.vy += vcPerpendicularToTangentY;
+
+  let d = Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+  let d2 = (ballDiameter - d) / 0.51;
+
+  a.x -= d2 * tvx;
+  a.y -= d2 * tvy;
+
+  b.x += d2 * tvx;
+  b.y += d2 * tvy;
+}
+
+function applyOneToManyBallsCollisions(target, rest) {
+  for (let other of rest) {
+    if (testCollision(target, ballRadius, other, ballRadius)) {
+      applyBallsCollision(target, other);
+    }
+  }
+}
+
+function applyBallsCollisions() {
+  for (let i = 0; i < balls.length - 1; i++) {
+    applyOneToManyBallsCollisions(balls[i], balls.slice(i + 1));
+  }
+}
+
+function arrayRemove(arr, item) {
+  let i = arr.indexOf(item);
+  if (i >= 0) {
+    arr.splice(i, 1);
+  }
+}
+
+function checkHole(ball) {
+  for (let pocket of pockets) {
+    if (
+      testCollision(pocket, pocketDiameter / 2, ball, ballLabelDiameter / 2)
+    ) {
+      arrayRemove(balls, ball);
+      return;
+    }
+  }
+}
+
+function checkHoles() {
+  // not checking the white ball on purpose
+  for (let i = 1; i < balls.length; i++) {
+    checkHole(balls[i]);
+  }
+}
+
+function isMoving(ball) {
+  return ball.vx !== 0 || ball.vy !== 0;
 }
