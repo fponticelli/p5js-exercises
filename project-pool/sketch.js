@@ -1,5 +1,5 @@
 function metersToPx(meters) {
-  return Math.round(meters * 220);
+  return Math.round(meters * 300);
 }
 
 function inchesToPx(inches) {
@@ -11,15 +11,15 @@ function feetToPx(feet, inches = 0) {
 }
 
 let table = {
-  width: inchesToPx(59),
-  height: inchesToPx(103),
+  height: inchesToPx(59),
+  width: inchesToPx(103),
 };
 
 let tableToRoomDistance = feetToPx(1); // 3' 5"
 
 let playArea = {
-  width: inchesToPx(44),
-  height: inchesToPx(88),
+  height: inchesToPx(44),
+  width: inchesToPx(88),
 };
 
 let room = {
@@ -50,12 +50,12 @@ let pockets = [
     y: playArea.y + playArea.height,
   },
   {
-    x: playArea.x,
-    y: playArea.y + playArea.height / 2,
+    x: playArea.x + playArea.width / 2,
+    y: playArea.y,
   },
   {
-    x: playArea.x + playArea.width,
-    y: playArea.y + playArea.height / 2,
+    x: playArea.x + playArea.width / 2,
+    y: playArea.y + playArea.height,
   },
 ];
 
@@ -64,6 +64,7 @@ let balls;
 let pocketDiameter = inchesToPx(4 + 5 / 8);
 
 let ballDiameter = inchesToPx(4); // inchesToPx(2 + 1 / 4);
+let shadowOffset = ballDiameter / 6;
 let ballRadius = ballDiameter / 2;
 
 let ballLabelFontSize = inchesToPx(1 + 1 / 2);
@@ -106,8 +107,12 @@ function setup() {
       noStroke();
       fill(color);
     },
+    ballShadow: () => {
+      noStroke();
+      fill(0, 0, 0, 0.2);
+    },
     ballHighlight: () => {
-      fill(0, 0, 95, 0.6);
+      fill(0, 0, 95, 0.8);
     },
     ballLabelBackground: () => {
       noStroke();
@@ -137,6 +142,7 @@ function setup() {
 function draw() {
   background(styles.background());
   drawTable();
+  drawBallShadows();
   drawBalls();
   if (!isMoving(balls[0])) {
     drawStick(balls[0]);
@@ -189,13 +195,13 @@ function drawTable() {
 
 function initBalls() {
   colorMode(HSB);
-  let cx = playArea.x + playArea.width / 2;
-  let cy = playArea.y + (playArea.height * 3) / 4;
+  let cx = playArea.x + playArea.width / 4;
+  let cy = playArea.y + playArea.height / 2;
 
-  let dx = playArea.x + playArea.width / 2;
-  let dy = playArea.y + playArea.height / 4;
+  let dx = playArea.x + (playArea.width / 4) * 3;
+  let dy = playArea.y + playArea.height / 2;
 
-  let white = color(0, 0, 100);
+  let white = color(0, 0, 90);
   let yellow = color(50, 90, 95);
   let red = color(10, 90, 95);
   let green = color(145, 90, 95);
@@ -208,35 +214,35 @@ function initBalls() {
   let angle = (30 / 180) * Math.PI;
   let dist = 1.1;
 
-  let row1x = Math.sin(angle) * ballDiameter * dist;
-  let row1y = Math.cos(angle) * ballDiameter * dist;
-  let row2y = row1y + Math.cos(angle) * ballDiameter * dist;
-  let row3y = row2y + Math.cos(angle) * ballDiameter * dist;
-  let row4y = row3y + Math.cos(angle) * ballDiameter * dist;
+  let row1x = Math.cos(angle) * ballDiameter * dist;
+  let row2x = row1x + Math.cos(angle) * ballDiameter * dist;
+  let row3x = row2x + Math.cos(angle) * ballDiameter * dist;
+  let row4x = row3x + Math.cos(angle) * ballDiameter * dist;
+  let row1y = Math.sin(angle) * ballDiameter * dist;
   return [
     { x: cx, y: cy, vx: 0, vy: 0, color: white },
     { x: dx, y: dy, vx: 0, vy: 0, number: 1, color: yellow },
-    { x: dx + row1x, y: dy - row1y, vx: 0, vy: 0, number: 3, color: red },
-    { x: dx - row1x, y: dy - row1y, vx: 0, vy: 0, number: 11, color: red },
+    { x: dx + row1x, y: dy + row1y, vx: 0, vy: 0, number: 3, color: red },
+    { x: dx + row1x, y: dy - row1y, vx: 0, vy: 0, number: 11, color: red },
     {
-      x: dx + ballDiameter * dist,
-      y: dy - row2y,
+      x: dx + row2x,
+      y: dy + ballDiameter * dist,
       vx: 0,
       vy: 0,
       number: 14,
       color: green,
     },
     {
-      x: dx,
-      y: dy - row2y,
+      x: dx + row2x,
+      y: dy,
       vx: 0,
       vy: 0,
       number: 8,
       color: black,
     },
     {
-      x: dx - ballDiameter * dist,
-      y: dy - row2y,
+      x: dx + row2x,
+      y: dy - ballDiameter * dist,
       vx: 0,
       vy: 0,
       number: 7,
@@ -244,59 +250,58 @@ function initBalls() {
     },
 
     {
-      x: dx + row1x + ballDiameter * dist,
-      y: dy - row3y,
+      x: dx + row3x,
+      y: dy + row1y + ballDiameter * dist,
       vx: 0,
       vy: 0,
       number: 9,
       color: yellow,
     },
-    { x: dx + row1x, y: dy - row3y, vx: 0, vy: 0, number: 4, color: magenta },
+    { x: dx + row3x, y: dy + row1y, vx: 0, vy: 0, number: 4, color: magenta },
     {
-      x: dx - row1x,
-      y: dy - row3y,
+      x: dx + row3x,
+      y: dy - row1y,
       vx: 0,
       vy: 0,
       number: 15,
       color: purple,
     },
     {
-      x: dx - row1x - ballDiameter * dist,
-      y: dy - row3y,
+      x: dx + row3x,
+      y: dy - row1y - ballDiameter * dist,
       vx: 0,
       vy: 0,
       number: 13,
       color: orange,
     },
-
     {
-      x: dx + ballDiameter * dist * 2,
-      y: dy - row4y,
+      x: dx + row4x,
+      y: dy + ballDiameter * dist * 2,
       vx: 0,
       vy: 0,
       number: 12,
       color: magenta,
     },
     {
-      x: dx + ballDiameter * dist,
-      y: dy - row4y,
+      x: dx + row4x,
+      y: dy + ballDiameter * dist,
       vx: 0,
       vy: 0,
       number: 5,
       color: orange,
     },
-    { x: dx, y: dy - row4y, vx: 0, vy: 0, number: 10, color: blue },
+    { x: dx + row4x, y: dy, vx: 0, vy: 0, number: 10, color: blue },
     {
-      x: dx - ballDiameter * dist,
-      y: dy - row4y,
+      x: dx + row4x,
+      y: dy - ballDiameter * dist,
       vx: 0,
       vy: 0,
       number: 2,
       color: blue,
     },
     {
-      x: dx - ballDiameter * dist * 2,
-      y: dy - row4y,
+      x: dx + row4x,
+      y: dy - ballDiameter * dist * 2,
       vx: 0,
       vy: 0,
       number: 7,
@@ -313,6 +318,11 @@ function drawBall(x, y, color) {
   circle(x - ballDiameter * factor, y - ballDiameter * factor, ballRadius);
 }
 
+function drawBallShadow(x, y) {
+  styles.ballShadow();
+  circle(x + shadowOffset, y + shadowOffset, ballDiameter);
+}
+
 function drawAnyBall(x, y, color, number) {
   drawBall(x, y, color);
   if (typeof number !== "undefined") {
@@ -320,6 +330,13 @@ function drawAnyBall(x, y, color, number) {
     circle(x, y, ballLabelDiameter);
     styles.ballLabelText();
     text(String(number), x, y);
+  }
+}
+
+function drawBallShadows() {
+  for (let i = 0; i < balls.length; i++) {
+    let ball = balls[i];
+    drawBallShadow(ball.x, ball.y);
   }
 }
 
